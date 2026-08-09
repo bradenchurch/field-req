@@ -1,9 +1,0 @@
-{
-  "framework": "node",
-  "outputDirectory": "public",
-  "installCommand": "npm install --include=dev",
-  "buildCommand": "npm run build",
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api" }
-  ]
-}
