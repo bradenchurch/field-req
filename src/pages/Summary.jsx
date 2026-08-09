@@ -1,4 +1,4 @@
-import React from 'react';
+
 import { Link } from 'react-router-dom';
 
 function Summary() {
@@ -32,7 +32,7 @@ function Summary() {
               <ul className="space-y-2">
                 <li className="flex items-start">
                   <span className="text-green-500 mr-2">✓</span>
-                  <span>2" PVC pipe (20 sticks) <span className="text-gray-500 text-sm ml-1">- requested by Mike</span></span>
+                  <span>2&quot; PVC pipe (20 sticks) <span className="text-gray-500 text-sm ml-1">- requested by Mike</span></span>
                 </li>
                 <li className="flex items-start">
                   <span className="text-yellow-500 mr-2">⊙</span>
@@ -40,7 +40,7 @@ function Summary() {
                 </li>
                 <li className="flex items-start">
                   <span className="text-green-500 mr-2">✓</span>
-                  <span>3" Cast iron fittings <span className="text-gray-500 text-sm ml-1">- requested by Jose (translated from Spanish)</span></span>
+                  <span>3&quot; Cast iron fittings <span className="text-gray-500 text-sm ml-1">- requested by Jose (translated from Spanish)</span></span>
                 </li>
               </ul>
             </div>
@@ -53,7 +53,7 @@ function Summary() {
               <ul className="space-y-2">
                 <li className="flex items-start">
                   <span className="text-green-500 mr-2">✓</span>
-                  <span>Copper tubing 1/2" <span className="text-gray-500 text-sm ml-1">- requested by Alex</span></span>
+                  <span>Copper tubing 1/2&quot; <span className="text-gray-500 text-sm ml-1">- requested by Alex</span></span>
                 </li>
                 <li className="text-gray-500 italic text-sm mt-2">
                   No other requests for this project.

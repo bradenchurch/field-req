@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 
 function Demo() {
@@ -67,7 +67,7 @@ function Demo() {
           <div className="space-y-4">
             {responses.length === 0 ? (
               <p className="text-gray-500 text-center py-8 border-2 border-dashed rounded">
-                No responses yet. Click "Start Check-in" to begin.
+                No responses yet. Click &quot;Start Check-in&quot; to begin.
               </p>
             ) : (
               responses.map((resp, idx) => (
