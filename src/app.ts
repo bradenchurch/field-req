@@ -8,8 +8,6 @@ dotenv.config();
 // Ensure basic critical env vars exist
 const requiredVars = [
   'DATABASE_URL',
-  'TWILIO_ACCOUNT_SID',
-  'TWILIO_AUTH_TOKEN',
   'TWILIO_PHONE_NUMBER',
   'RESEND_API_KEY',
   'GEMINI_API_KEY',
@@ -21,6 +19,14 @@ for (const envVar of requiredVars) {
   if (!process.env[envVar]) {
     console.warn(`WARNING: Missing environment variable ${envVar}. Some features may not work as expected.`);
   }
+}
+
+// Twilio auth is flexible: API key pair (SK...) + account SID, or legacy SID + auth token.
+// The sms service module reports the exact missing pieces; just surface a summary here.
+const hasApiKeyAuth = !!(process.env.TWILIO_API_KEY_SID && process.env.TWILIO_API_KEY_SECRET && process.env.TWILIO_ACCOUNT_SID);
+const hasLegacyAuth = !!(process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN);
+if (!hasApiKeyAuth && !hasLegacyAuth) {
+  console.warn('WARNING: Twilio auth not fully configured. Set TWILIO_API_KEY_SID + TWILIO_API_KEY_SECRET + TWILIO_ACCOUNT_SID (or legacy TWILIO_ACCOUNT_SID + TWILIO_AUTH_TOKEN). SMS will not work.');
 }
 
 const app = express();
