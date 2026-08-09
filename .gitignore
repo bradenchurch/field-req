@@ -3,3 +3,6 @@ node_modules/
 .vercel/
 dist/
 .env.vercel
+server.log
+server/crew.json
+server/responses.json
