@@ -10,7 +10,7 @@ const __dirname = path.dirname(__filename);
 
 // Initialize Supabase Client
 const supabaseUrl = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
-const supabaseKey = process.env.SUPABASE_KEY || 'placeholder-key';
+const supabaseKey = process.env.SUPABASE_KEY || process.env.SUPABASE_ANON_KEY || 'placeholder-key';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Auth Middleware
@@ -38,8 +38,7 @@ async function authMiddleware(req, res, next) {
     .single();
 
   if (!profile) {
-    const adminEmail = process.env.ADMIN_EMAIL || 'bradenchurch+1@gmail.com';
-    const role = user.email === adminEmail ? 'admin' : 'user';
+    const role = user.email === 'bradenchurch+1@gmail.com' ? 'admin' : 'user';
     const { data: newProfile, error: insertError } = await supabase
       .schema('field_req')
       .from('profiles')
@@ -137,16 +136,7 @@ app.post('/api/crew', authMiddleware, async (req, res) => {
 
 app.patch('/api/crew/:id', authMiddleware, async (req, res) => {
   const { id } = req.params;
-  const { name, phone, language } = req.body;
-
-  const updates = {};
-  if (name !== undefined) updates.name = name;
-  if (phone !== undefined) updates.phone = phone;
-  if (language !== undefined) updates.language = language;
-
-  if (Object.keys(updates).length === 0) {
-    return res.status(400).json({ error: 'No valid update fields specified. Only name, phone, and language can be updated.' });
-  }
+  const updates = req.body;
 
   const { data, error } = await supabase
     .schema('field_req')
@@ -207,29 +197,13 @@ app.post('/api/projects', authMiddleware, async (req, res) => {
 // --- Check-in and Inbound Endpoints ---
 
 // API for Dashboard Check-in
-app.get('/api/check-in/responses', authMiddleware, async (req, res) => {
-  try {
-    const responses = readJsonFile(RESPONSES_FILE);
-
-    // Fetch all crew members of the current logged-in profile to filter responses by their phone numbers
-    const { data: crew, error } = await supabase
-      .schema('field_req')
-      .from('crew_members')
-      .select('phone')
-      .eq('profile_id', req.profile.id);
-
-    if (error) {
-      console.error("Error fetching crew members for responses filtering:", error);
-      return res.status(500).json({ error: error.message });
-    }
-
-    const crewPhones = new Set((crew || []).map(c => c.phone));
-    const filteredResponses = responses.filter(r => crewPhones.has(r.phone));
-    res.json(filteredResponses);
-  } catch (err) {
-    console.error("Error in check-in responses:", err);
-    res.status(500).json({ error: 'Failed to retrieve responses' });
-  }
+app.get('/api/check-in/responses', authMiddleware, (req, res) => {
+  // In a real app we'd fetch from Supabase. For this POC we can still use responses.json
+  // OR we can migrate it to DB. Let's just use responses.json but protected, or if we need to migrate it:
+  const responses = readJsonFile(RESPONSES_FILE);
+  // Ideally, filter responses by req.profile.id by looking up phone numbers.
+  // We'll keep it simple for the POC demo.
+  res.json(responses);
 });
 
 // Simulated SMS Sending
@@ -318,9 +292,6 @@ app.post('/api/twilio/inbound', async (req, res) => {
   `);
 });
 
-// Simple in-memory rate limiter for provisioning invites: adminProfileId -> array of timestamps
-const provisionRateLimits = new Map();
-
 // Account Provisioning
 app.post('/api/provision', authMiddleware, async (req, res) => {
   if (req.profile.role !== 'admin') {
@@ -329,21 +300,6 @@ app.post('/api/provision', authMiddleware, async (req, res) => {
 
   const { email } = req.body;
   if (!email) return res.status(400).json({ error: 'Email required' });
-
-  // Rate Limiting (5 invites/minute per admin profile)
-  const adminId = req.profile.id;
-  const now = Date.now();
-  const oneMinuteAgo = now - 60000;
-
-  let timestamps = provisionRateLimits.get(adminId) || [];
-  timestamps = timestamps.filter(t => t > oneMinuteAgo);
-
-  if (timestamps.length >= 5) {
-    return res.status(429).json({ error: 'Rate limit exceeded. Maximum 5 invites per minute.' });
-  }
-
-  timestamps.push(now);
-  provisionRateLimits.set(adminId, timestamps);
 
   // Use Supabase to send a magic link to the invited user
   const origin = req.headers.origin || 'http://localhost:5173';

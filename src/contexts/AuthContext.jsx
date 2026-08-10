@@ -1,8 +1,9 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 const AuthContext = createContext({});
 
+// eslint-disable-next-line react-refresh/only-export-components
 export const useAuth = () => useContext(AuthContext);
 
 export const AuthProvider = ({ children }) => {
@@ -12,24 +13,18 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const adminEmail = import.meta.env.VITE_ADMIN_EMAIL || 'bradenchurch+1@gmail.com';
-    supabase.auth.getSession()
-      .then(({ data: { session } }) => {
-        setSession(session);
-        setUser(session?.user || null);
-        setIsAdmin(session?.user?.email === adminEmail);
-        setLoading(false);
-      })
-      .catch((err) => {
-        console.error("Error getting session from Supabase:", err);
-        setLoading(false);
-      });
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user || null);
+      setIsAdmin(session?.user?.email === 'bradenchurch+1@gmail.com');
+      setLoading(false);
+    });
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       (event, session) => {
         setSession(session);
         setUser(session?.user || null);
-        setIsAdmin(session?.user?.email === adminEmail);
+        setIsAdmin(session?.user?.email === 'bradenchurch+1@gmail.com');
         setLoading(false);
       }
     );

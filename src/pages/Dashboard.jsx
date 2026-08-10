@@ -1,4 +1,3 @@
-import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import CrewManager from '../components/CrewManager';
 import ProjectManager from '../components/ProjectManager';
