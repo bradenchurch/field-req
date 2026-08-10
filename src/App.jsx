@@ -2,6 +2,10 @@
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
 import Demo from './pages/Demo';
 import Summary from './pages/Summary';
+import Login from './pages/Login';
+import AuthCallback from './pages/AuthCallback';
+import Dashboard from './pages/Dashboard';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function Landing() {
   return (
@@ -29,6 +33,24 @@ function App() {
         <Route path="/" element={<Landing />} />
         <Route path="/demo" element={<Demo />} />
         <Route path="/demo/summary" element={<Summary />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );
