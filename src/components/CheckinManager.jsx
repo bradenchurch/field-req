@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 function CheckinManager() {
@@ -7,7 +7,7 @@ function CheckinManager() {
   const [error, setError] = useState(null);
   const { session } = useAuth();
 
-  const fetchResponses = async () => {
+  const fetchResponses = useCallback(async () => {
     try {
       const res = await fetch('/api/check-in/responses', {
         headers: { Authorization: `Bearer ${session?.access_token}` }
@@ -19,13 +19,13 @@ function CheckinManager() {
     } catch (err) {
       console.error("Failed to fetch responses", err);
     }
-  };
+  }, [session]);
 
   useEffect(() => {
     fetchResponses();
     const interval = setInterval(fetchResponses, 5000);
     return () => clearInterval(interval);
-  }, [session]);
+  }, [fetchResponses]);
 
   const handleStartCheckIn = async () => {
     setLoading(true);
@@ -63,7 +63,7 @@ function CheckinManager() {
       <div className="space-y-4 max-h-96 overflow-y-auto">
         {responses.length === 0 ? (
           <p className="text-gray-500 text-center py-8 border-2 border-dashed rounded">
-            No responses yet. Click "Trigger Check-in" to begin.
+            No responses yet. Click &quot;Trigger Check-in&quot; to begin.
           </p>
         ) : (
           responses.map((resp, idx) => (

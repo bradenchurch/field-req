@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 function CrewManager() {
@@ -7,11 +7,7 @@ function CrewManager() {
   const [form, setForm] = useState({ name: '', phone: '', language: 'en' });
   const { session } = useAuth();
 
-  useEffect(() => {
-    fetchCrew();
-  }, []);
-
-  const fetchCrew = async () => {
+  const fetchCrew = useCallback(async () => {
     try {
       const res = await fetch('/api/crew', {
         headers: { Authorization: `Bearer ${session?.access_token}` }
@@ -25,7 +21,11 @@ function CrewManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session]);
+
+  useEffect(() => {
+    fetchCrew();
+  }, [fetchCrew]);
 
   const handleAdd = async (e) => {
     e.preventDefault();

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 
 function ProjectManager() {
@@ -7,11 +7,7 @@ function ProjectManager() {
   const [form, setForm] = useState({ name: '', address: '', specs: '' });
   const { session } = useAuth();
 
-  useEffect(() => {
-    fetchProjects();
-  }, []);
-
-  const fetchProjects = async () => {
+  const fetchProjects = useCallback(async () => {
     try {
       const res = await fetch('/api/projects', {
         headers: { Authorization: `Bearer ${session?.access_token}` }
@@ -25,7 +21,11 @@ function ProjectManager() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [session]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   const handleAdd = async (e) => {
     e.preventDefault();
