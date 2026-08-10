@@ -1,7 +1,9 @@
 
 import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';
-import Demo from './pages/Demo';
-import Summary from './pages/Summary';
+import Login from './pages/Login';
+import AuthCallback from './pages/AuthCallback';
+import Dashboard from './pages/Dashboard';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function Landing() {
   return (
@@ -10,11 +12,8 @@ function Landing() {
         <h1 className="text-3xl font-bold mb-4 text-gray-900">FieldReq</h1>
         <p className="text-gray-600 mb-8">SMS Material Outreach Agent</p>
         <div className="space-y-4">
-          <Link to="/demo" className="block w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition">
-            View Live Demo
-          </Link>
-          <Link to="/demo/summary" className="block w-full bg-white border border-gray-300 text-gray-700 py-3 rounded-lg hover:bg-gray-50 transition">
-            View Summary Page
+          <Link to="/login" className="block w-full bg-blue-600 text-white py-3 rounded-lg hover:bg-blue-700 transition">
+            Sign In / Login
           </Link>
         </div>
       </div>
@@ -27,8 +26,24 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Landing />} />
-        <Route path="/demo" element={<Demo />} />
-        <Route path="/demo/summary" element={<Summary />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        <Route
+          path="/dashboard"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            <ProtectedRoute>
+              <Dashboard />
+            </ProtectedRoute>
+          }
+        />
       </Routes>
     </BrowserRouter>
   );

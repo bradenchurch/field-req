@@ -3,9 +3,64 @@ import cors from 'cors';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createClient } from '@supabase/supabase-js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Initialize Supabase Client
+const supabaseUrl = process.env.SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = process.env.SUPABASE_KEY || 'placeholder-key';
+const supabase = createClient(supabaseUrl, supabaseKey);
+
+// Auth Middleware
+async function authMiddleware(req, res, next) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader) {
+    return res.status(401).json({ error: 'Missing authorization header' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  const { data: { user }, error } = await supabase.auth.getUser(token);
+
+  if (error || !user) {
+    return res.status(401).json({ error: 'Invalid or expired token' });
+  }
+
+  req.user = user;
+
+  // Ensure a profile exists for this user
+  let { data: profile } = await supabase
+    .schema('field_req')
+    .from('profiles')
+    .select('*')
+    .eq('email', user.email)
+    .single();
+
+  if (!profile) {
+    const adminEmail = process.env.ADMIN_EMAIL || 'bradenchurch+1@gmail.com';
+    const role = user.email === adminEmail ? 'admin' : 'user';
+    const { data: newProfile, error: insertError } = await supabase
+      .schema('field_req')
+      .from('profiles')
+      .insert({
+        email: user.email,
+        auth_id: user.id,
+        role
+      })
+      .select()
+      .single();
+
+    if (insertError) {
+      console.error("Failed to create profile:", insertError);
+      return res.status(500).json({ error: 'Failed to create user profile' });
+    }
+    profile = newProfile;
+  }
+
+  req.profile = profile;
+  next();
+}
 
 const app = express();
 app.use(cors());
@@ -51,15 +106,150 @@ if (!fs.existsSync(RESPONSES_FILE)) {
   writeJsonFile(RESPONSES_FILE, []);
 }
 
+// --- Crew Endpoints ---
+
+app.get('/api/crew', authMiddleware, async (req, res) => {
+  const { data, error } = await supabase
+    .schema('field_req')
+    .from('crew_members')
+    .select('*')
+    .eq('profile_id', req.profile.id)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.post('/api/crew', authMiddleware, async (req, res) => {
+  const { name, phone, language } = req.body;
+  if (!name || !phone) return res.status(400).json({ error: 'Name and phone required' });
+
+  const { data, error } = await supabase
+    .schema('field_req')
+    .from('crew_members')
+    .insert({ profile_id: req.profile.id, name, phone, language })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.patch('/api/crew/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+  const { name, phone, language } = req.body;
+
+  const updates = {};
+  if (name !== undefined) updates.name = name;
+  if (phone !== undefined) updates.phone = phone;
+  if (language !== undefined) updates.language = language;
+
+  if (Object.keys(updates).length === 0) {
+    return res.status(400).json({ error: 'No valid update fields specified. Only name, phone, and language can be updated.' });
+  }
+
+  const { data, error } = await supabase
+    .schema('field_req')
+    .from('crew_members')
+    .update(updates)
+    .eq('id', id)
+    .eq('profile_id', req.profile.id)
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.delete('/api/crew/:id', authMiddleware, async (req, res) => {
+  const { id } = req.params;
+
+  const { error } = await supabase
+    .schema('field_req')
+    .from('crew_members')
+    .delete()
+    .eq('id', id)
+    .eq('profile_id', req.profile.id);
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json({ success: true });
+});
+
+// --- Project Endpoints ---
+
+app.get('/api/projects', authMiddleware, async (req, res) => {
+  const { data, error } = await supabase
+    .schema('field_req')
+    .from('projects')
+    .select('*')
+    .eq('profile_id', req.profile.id)
+    .order('created_at', { ascending: false });
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+app.post('/api/projects', authMiddleware, async (req, res) => {
+  const { name, address, specs } = req.body;
+  if (!name) return res.status(400).json({ error: 'Name is required' });
+
+  const { data, error } = await supabase
+    .schema('field_req')
+    .from('projects')
+    .insert({ profile_id: req.profile.id, name, address, specs })
+    .select()
+    .single();
+
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
+// --- Check-in and Inbound Endpoints ---
+
+// API for Dashboard Check-in
+app.get('/api/check-in/responses', authMiddleware, async (req, res) => {
+  try {
+    const responses = readJsonFile(RESPONSES_FILE);
+
+    // Fetch all crew members of the current logged-in profile to filter responses by their phone numbers
+    const { data: crew, error } = await supabase
+      .schema('field_req')
+      .from('crew_members')
+      .select('phone')
+      .eq('profile_id', req.profile.id);
+
+    if (error) {
+      console.error("Error fetching crew members for responses filtering:", error);
+      return res.status(500).json({ error: error.message });
+    }
+
+    const crewPhones = new Set((crew || []).map(c => c.phone));
+    const filteredResponses = responses.filter(r => crewPhones.has(r.phone));
+    res.json(filteredResponses);
+  } catch (err) {
+    console.error("Error in check-in responses:", err);
+    res.status(500).json({ error: 'Failed to retrieve responses' });
+  }
+});
+
 // Simulated SMS Sending
-app.post('/api/check-in/send', (req, res) => {
-  const crew = readJsonFile(CREW_FILE);
+app.post('/api/check-in/send', authMiddleware, async (req, res) => {
+  const { data: crew, error } = await supabase
+    .schema('field_req')
+    .from('crew_members')
+    .select('*')
+    .eq('profile_id', req.profile.id);
+
+  if (error || !crew) {
+    return res.status(500).json({ error: 'Failed to fetch crew' });
+  }
 
   // Here we would normally use Twilio to send SMS
   crew.forEach(member => {
+    // Note: We don't have project assignment strictly tied in this POC, so we use a generic message.
     const msg = member.language === 'es'
-      ? `Hola ${member.name.split(' ')[0]}, ¿necesitas algún material para ${member.project} esta semana?`
-      : `Hi ${member.name.split(' ')[0]}, do you need any materials for ${member.project} this week?`;
+      ? `Hola ${member.name.split(' ')[0]}, ¿necesitas algún material para esta semana?`
+      : `Hi ${member.name.split(' ')[0]}, do you need any materials for this week?`;
 
     console.log(`[Twilio Mock] Sending to ${member.phone}: ${msg}`);
   });
@@ -68,44 +258,50 @@ app.post('/api/check-in/send', (req, res) => {
 });
 
 // Twilio Webhook (Inbound SMS)
-app.post('/api/twilio/inbound', (req, res) => {
+app.post('/api/twilio/inbound', async (req, res) => {
   const { From, Body } = req.body;
   const messageBody = Body ? Body.trim() : '';
-  const crew = readJsonFile(CREW_FILE);
 
-  // Find crew member
-  const member = crew.find(c => c.phone === From) || { name: 'Unknown', language: 'en', project: 'Unknown Project' };
+  // Find crew member from Supabase
+  const { data: member } = await supabase
+    .schema('field_req')
+    .from('crew_members')
+    .select('*')
+    .eq('phone', From)
+    .single();
 
-  // Detect Spanish (very basic check for POC)
-  const isSpanish = /necesito|para|tubos|gracias|hola|si|sí/i.test(messageBody) || member.language === 'es';
+  const foundMember = member || { name: 'Unknown', language: 'en', project: 'Unknown Project' };
+
+  // Detect Spanish
+  const isSpanish = /necesito|para|tubos|gracias|hola|si|sí/i.test(messageBody) || foundMember.language === 'es';
   const language = isSpanish ? 'es' : 'en';
 
-  // Intent Classification (very basic)
+  // Intent Classification
   let intent = 'general';
   if (/(pipe|tubo|fitting|glue|pvc|copper)/i.test(messageBody)) {
     intent = 'material_request';
   }
 
-  // Save Response
+  // Save Response to JSON for POC
   const responses = readJsonFile(RESPONSES_FILE);
   const newResponse = {
     phone: From,
-    name: member.name,
-    project: member.project,
+    name: foundMember.name,
+    project: foundMember.project || 'General',
     message: messageBody,
     language,
     intent,
     timestamp: new Date().toISOString()
   };
-  responses.unshift(newResponse); // Add to top
+  responses.unshift(newResponse);
   writeJsonFile(RESPONSES_FILE, responses);
 
   // Generate Reply
   let replyMsg = '';
   if (intent === 'material_request') {
     replyMsg = language === 'es'
-      ? `¡Recibido! Agregado a la lista de ${member.project}.`
-      : `Got it! Added to the list for ${member.project}.`;
+      ? `¡Recibido! Agregado a la lista.`
+      : `Got it! Added to the list.`;
   } else {
     replyMsg = language === 'es'
       ? `¡Entendido! Le avisaré al jefe.`
@@ -114,7 +310,6 @@ app.post('/api/twilio/inbound', (req, res) => {
 
   console.log(`[Twilio Mock] Replying to ${From}: ${replyMsg}`);
 
-  // Send TwiML response
   res.set('Content-Type', 'text/xml');
   res.send(`
     <Response>
@@ -123,10 +318,47 @@ app.post('/api/twilio/inbound', (req, res) => {
   `);
 });
 
-// API for Demo Page
-app.get('/api/check-in/responses', (req, res) => {
-  const responses = readJsonFile(RESPONSES_FILE);
-  res.json(responses);
+// Simple in-memory rate limiter for provisioning invites: adminProfileId -> array of timestamps
+const provisionRateLimits = new Map();
+
+// Account Provisioning
+app.post('/api/provision', authMiddleware, async (req, res) => {
+  if (req.profile.role !== 'admin') {
+    return res.status(403).json({ error: 'Only admins can provision accounts' });
+  }
+
+  const { email } = req.body;
+  if (!email) return res.status(400).json({ error: 'Email required' });
+
+  // Rate Limiting (5 invites/minute per admin profile)
+  const adminId = req.profile.id;
+  const now = Date.now();
+  const oneMinuteAgo = now - 60000;
+
+  let timestamps = provisionRateLimits.get(adminId) || [];
+  timestamps = timestamps.filter(t => t > oneMinuteAgo);
+
+  if (timestamps.length >= 5) {
+    return res.status(429).json({ error: 'Rate limit exceeded. Maximum 5 invites per minute.' });
+  }
+
+  timestamps.push(now);
+  provisionRateLimits.set(adminId, timestamps);
+
+  // Use Supabase to send a magic link to the invited user
+  const origin = req.headers.origin || 'http://localhost:5173';
+  const { error } = await supabase.auth.signInWithOtp({
+    email,
+    options: {
+      emailRedirectTo: `${origin}/auth/callback`
+    }
+  });
+
+  if (error) {
+    return res.status(500).json({ error: error.message });
+  }
+
+  res.json({ success: true, message: `Magic link sent to ${email}` });
 });
 
 app.listen(PORT, () => {
